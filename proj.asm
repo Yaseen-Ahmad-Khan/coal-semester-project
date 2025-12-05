@@ -876,7 +876,7 @@ check_key_loop:
     cmp ah, 01h             
     je hi_pause_game
     
-    ; --- ARROW KEY FIX: Handle Normal (AL=0) AND Extended (AL=E0) Keys ---
+   
     cmp al, 0
     je process_key
     cmp al, 0E0h        
@@ -3006,5 +3006,5 @@ file_is_pal db "ispal.bin", 0
 file_is_pix db "ispixels.bin", 0
 file_st_pal db "stpal.bin", 0
 file_st_pix db "stpixels.bin", 0
-file_qu_pal db "qupal.bin", 0    ; ADDED: Quit Screen Palette
-file_qu_pix db "qupixels.bin", 0 ; ADDED: Quit Screen Pixels
+file_qu_pal db "qupal.bin", 0    ; 
+file_qu_pix db "qupixels.bin", 0 ; 
