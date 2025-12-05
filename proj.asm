@@ -382,6 +382,9 @@ story_resume:
     jmp wait_for_space_start
 
 quit_direct_dos:
+    push cs
+    pop ds
+    call remove_music_interrupt
     mov ax, 0003h
     int 10h
     mov ax, 4C00h
@@ -399,6 +402,8 @@ mov es, ax
 mov ss, ax
 mov sp, 0xFFFE
 sti
+
+call setup_music_interrupt
 
 ; Init Video
 mov ax, 0013h
@@ -532,6 +537,24 @@ no_collision_continue:
     
     cmp ax, 200
     jb bnao
+    ; ======================================================
+    ; FIX: BLUE CAR SAFE DISTANCE CHECK
+    ; ======================================================
+    
+    ; 1. Check distance from Coin
+    mov cx, [coin_y]
+    cmp cx, 70              ; Safe distance (70 pixels)
+    jl keep_blue_car_waiting
+
+    ; 2. Check distance from Fuel (only if active)
+    cmp word [fuel_can_active], 1
+    jne spawn_blue_car_now
+    mov cx, [fuel_can_y]
+    cmp cx, 70              ; Safe distance
+    jl keep_blue_car_waiting
+
+spawn_blue_car_now:
+    ; Safe to spawn - proceed with standard reset
     mov word [blue_car_y], 10
     call get_random_0_to_2
     cmp bx, 0
@@ -545,6 +568,13 @@ lane1:
     jmp bnao
 lane2:
     mov word [blue_car_x], 148
+    jmp bnao
+
+keep_blue_car_waiting:
+    ; Not safe yet, keep it off-screen
+    mov word [blue_car_y], 205
+    jmp bnao
+    ; ======================================================
     
 bnao:
     call draw_blue_car
@@ -564,6 +594,23 @@ bnao:
     
     cmp ax, 200
     jb cnao
+    ; ======================================================
+    ; FIX: COIN SAFE DISTANCE CHECK
+    ; ======================================================
+
+    ; 1. Check distance from Blue Car
+    mov cx, [blue_car_y]
+    cmp cx, 70          ; Safe distance
+    jl keep_coin_waiting
+
+    ; 2. Check distance from Fuel (only if active)
+    cmp word [fuel_can_active], 1
+    jne spawn_coin_now
+    mov cx, [fuel_can_y]
+    cmp cx, 70          ; Safe distance
+    jl keep_coin_waiting
+
+spawn_coin_now:
     mov word [coin_y], 10
     
     call get_random_0_to_2
@@ -578,7 +625,14 @@ coin_lane1:
     jmp cnao
 coin_lane2:
     mov word [coin_x], 160
-    
+    jmp cnao
+
+keep_coin_waiting:
+    ; Not safe yet, keep coin off-screen
+    mov word [coin_y], 205 
+    jmp cnao
+    ; ======================================================    
+
 cnao:
     call draw_coin
     ; NEW: FUEL CAN LOGIC
@@ -591,19 +645,21 @@ cnao:
     jl fuel_can_already_active
  
 
-    ; --- FIX START: CHECK BLUE CAR POSITION ---
-    ; Only spawn if Blue Car is far away vertically OR distinct horizontally
+    ; ======================================================
+    ; FIX: FUEL SAFE DISTANCE CHECK
+    ; ======================================================
+    
+    ; 1. Check Blue Car Position
     mov ax, [blue_car_y]
-    cmp ax, 80              ; If blue car is in top 80 pixels...
-    jg safe_to_spawn        ; If it's lower down, it's safe to spawn anywhere
+    cmp ax, 70              ; If car is in top 70px
+    jl fuel_can_already_active ; Don't spawn yet, try next frame
     
-    ; Blue car is at top. We must avoid its lane.
-    ; This simple logic just delays spawn 1 frame if they would overlap.
-    ; It's the easiest fix without complex math.
-    jmp fuel_can_already_active 
-    
-safe_to_spawn:
-    ; --- FIX END ---
+    ; 2. Check Coin Position
+    mov ax, [coin_y]
+    cmp ax, 70              ; If coin is in top 70px
+    jl fuel_can_already_active ; Don't spawn yet
+
+    ; ======================================================
     
     ; Spawn new fuel can
     mov word [fuel_spawn_counter], 0
@@ -2617,11 +2673,18 @@ draw_bar_bg_col:
     mov si, 180
     mov dx, 6
     
-    ; Determine Color (Green normally, Red if low)
-    mov al, 2        ; Green
-    cmp word [fuel_val], 15
-    jg color_selected
-    mov al, 4        ; Red
+; Determine Color
+    mov al, 2           ; Default: Green
+    
+    cmp word [fuel_val], 20
+    jg color_selected   ; If > 20 (Above 50%), keep Green
+    
+    mov al, 14          ; Set Yellow (50% or less)
+    cmp word [fuel_val], 10
+    jg color_selected   ; If > 10 (Above 25%), keep Yellow
+    
+    mov al, 4           ; Set Red (25% or less)
+
 color_selected:
 
 draw_bar_fill_row:
@@ -3798,6 +3861,134 @@ b_drt2_skip:
     pop ax
     ret
 
+; ==================================================================
+; MULTITASKING: BACKGROUND MUSIC ISR
+; ==================================================================
+setup_music_interrupt:
+    cli                         ; Disable interrupts while hooking
+    
+    mov ah, 35h
+    mov al, 1Ch
+    int 21h
+    mov [old_isr_offset], bx
+    mov [old_isr_segment], es
+
+    ; 2. Set New Interrupt Vector to our routine
+    mov ah, 25h
+    mov al, 1Ch
+    mov dx, music_player_isr
+    push cs
+    pop ds                  
+    int 21h
+    
+    mov byte [music_active], 1
+    sti                         ; Re-enable interrupts
+    ret
+
+remove_music_interrupt:
+    cmp byte [music_active], 0
+    je remove_skip
+    
+    cli
+    ; 1. Silence the Speaker immediately
+    in al, 61h
+    and al, 0FCh            ; Clear bits 0 and 1
+    out 61h, al
+
+    ; 2. Restore Old Interrupt Vector
+    mov dx, [old_isr_offset]
+    mov ds, [old_isr_segment]
+    mov ah, 25h
+    mov al, 1Ch
+    int 21h
+    
+    push cs                  ; Restore DS to Code Segment
+    pop ds
+    sti
+    mov byte [music_active], 0
+remove_skip:
+    ret
+
+
+music_player_isr:
+    pusha                    
+    push ds
+    push es
+    
+    ; Ensure DS points to our data
+    push cs
+    pop ds
+
+    ; Logic: Decrease duration counter
+    dec word [music_tick_count]
+    cmp word [music_tick_count], 0
+    jg music_keep_playing   
+
+    ; Load Next Note
+    mov si,  music_score
+    add si, [current_note_idx]
+    
+    mov ax, [si]           
+    cmp ax, 0
+    je music_reset_song     
+
+    mov cx, [si+2]          
+    mov [music_tick_count], cx
+    
+    add word [current_note_idx], 4 
+
+    ; Play the Sound
+    call play_frequency_port
+    jmp music_keep_playing
+
+music_reset_song:
+    mov word [current_note_idx], 0
+    mov word [music_tick_count], 1 
+    jmp music_keep_playing
+
+music_keep_playing:
+    pop es
+    pop ds
+    popa                    
+    iret                   
+
+; ------------------------------------------------------------------
+; HARDWARE PORT ACCESS
+; ------------------------------------------------------------------
+play_frequency_port:
+    ; AX contains Frequency in Hz
+    cmp ax, 0
+    je silence_speaker      ; If freq is 0, silence (rest)
+
+    ; 1. Set up PIT (Programmable Interval Timer)
+    push ax
+    mov al, 0B6h            ; Channel 2, LSB/MSB, Square Wave
+    out 43h, al
+    
+    ; 2. Calculate Divisor (1,193,180 / Frequency)
+    mov dx, 0012h
+    mov ax, 34DCh           ; DX:AX = 1,193,180
+    pop bx                  ; Retrieve Frequency
+    div bx
+    
+    ; 3. Send Divisor to Port 42h
+    out 42h, al             ; Send LSB
+    mov al, ah
+    out 42h, al             ; Send MSB
+
+    ; 4. Turn Speaker ON (Port 61h)
+    in al, 61h
+    or al, 03h              ; Set bits 0 and 1
+    out 61h, al
+    ret
+
+silence_speaker:
+    in al, 61h
+    and al, 0FCh            ; Clear bits 0 and 1
+    out 61h, al
+    ret
+
+
 get_random_0_to_2:
     push ax
     push cx
@@ -3826,6 +4017,9 @@ rtc_delay:
     pop cx
     pop ax
     ret
+
+
+
 
 car_x dw 0
 car_y dw 0
@@ -3904,7 +4098,47 @@ file_fu_pix db "fupixels.bin", 0
 file_re_pal db "repal.bin", 0
 file_re_pix db "repixels.bin", 0
 
-; --- NEW STRINGS FOR RESULTS SCREEN ---
+
 txt_res_name  db "NAME: ", 0
 txt_res_roll  db "ROLL: ", 0
 txt_res_score db "SCORE: ", 0
+
+; ==================================================================
+; MUSIC DATA SECTION
+; ==================================================================
+; Frequencies (Hertz)
+NOTE_C4  EQU 262
+NOTE_D4  EQU 294
+NOTE_E4  EQU 330
+NOTE_F4  EQU 349
+NOTE_G4  EQU 392
+NOTE_A4  EQU 440
+NOTE_B4  EQU 494
+NOTE_C5  EQU 523
+
+; Music State Variables
+old_isr_offset  dw 0
+old_isr_segment dw 0
+music_tick_count dw 1
+current_note_idx dw 0
+music_active     db 0    ; 1 = ON, 0 = OFF
+
+
+music_score:
+    ; Pattern 1: Fast rising arpeggio (C Major)
+    dw NOTE_C4, 2, NOTE_E4, 2, NOTE_G4, 2, NOTE_C5, 2
+    dw NOTE_G4, 2, NOTE_E4, 2, NOTE_C4, 2, 0, 1       ; Brief rest
+
+    ; Pattern 2: Fast rising arpeggio (D Minorish)
+    dw NOTE_D4, 2, NOTE_F4, 2, NOTE_A4, 2, NOTE_D4, 2
+    dw NOTE_A4, 2, NOTE_F4, 2, NOTE_D4, 2, 0, 1
+
+    ; Pattern 3: Rising Tension
+    dw NOTE_E4, 2, NOTE_G4, 2, NOTE_B4, 2, NOTE_E4, 2
+    dw NOTE_F4, 2, NOTE_A4, 2, NOTE_C5, 2, NOTE_F4, 2
+    
+    ; Pattern 4: Quick Descent
+    dw NOTE_G4, 2, NOTE_F4, 2, NOTE_E4, 2, NOTE_D4, 2
+    dw NOTE_C4, 4, 0, 4                               ; End phrase with a hold
+
+    dw 0, 0 ; End of list marker (Loops back)
