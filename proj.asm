@@ -257,12 +257,7 @@ out_nr_pal_loop:
     mov ah, 3Eh
     int 21h
 
-    ; ==========================================================
-    ; FIX: FORCE ES TO CS BEFORE TYPING
-    ; We are about to use STOSB to save input to variables.
-    ; Previous code left ES at 0xA000 (Video Memory).
-    ; We must reset ES to CS so data saves to RAM, not Screen.
-    ; ==========================================================
+
     push cs
     pop es 
     ; ==========================================================
@@ -453,16 +448,21 @@ call get_random_0_to_2
     je lane2_initial
     mov word [blue_car_x], 203
     jmp initialize_y
+; ... inside start_game ...
+
 lane1_initial:
     mov word [blue_car_x], 90
     jmp initialize_y
 lane2_initial:
     mov word [blue_car_x], 148
 initialize_y:
-    mov word [blue_car_y], 10
+  
+    mov word [blue_car_y], -45 
+    ; -----------------------------------------------
+    
 mov ax, [blue_car_x]
 mov [blue_car_x_old], ax
-mov word [blue_car_y_old], 10
+mov word [blue_car_y_old], -45  ; Update old Y as well
 
 call get_random_0_to_2
     cmp bx, 0
@@ -509,7 +509,7 @@ running_game:
     
     call handle_input
     
-    ; [SHORT JUMP FIX] Use trampoline logic
+    
     cmp word [game_state], 1
     je continue_render
     jmp animation_loop
@@ -536,11 +536,8 @@ continue_render:
 no_collision_continue:
     
     cmp ax, 200
-    jb bnao
-    ; ======================================================
-    ; FIX: BLUE CAR SAFE DISTANCE CHECK
-    ; ======================================================
-    
+    jl bnao
+
     ; 1. Check distance from Coin
     mov cx, [coin_y]
     cmp cx, 70              ; Safe distance (70 pixels)
@@ -555,10 +552,17 @@ no_collision_continue:
 
 spawn_blue_car_now:
     ; Safe to spawn - proceed with standard reset
-    mov word [blue_car_y], 10
+    inc word [score]        ; Increase score by 1
+    call draw_score         ; Update score display
+    
+    
+    mov word [blue_car_y], -45
+    ; -------------------------------------------------
+
     call get_random_0_to_2
     cmp bx, 0
     je lane1
+    ; ... rest of the code is same ...
     cmp bx, 1
     je lane2
     mov word [blue_car_x], 203
@@ -574,7 +578,7 @@ keep_blue_car_waiting:
     ; Not safe yet, keep it off-screen
     mov word [blue_car_y], 205
     jmp bnao
-    ; ======================================================
+
     
 bnao:
     call draw_blue_car
@@ -594,9 +598,7 @@ bnao:
     
     cmp ax, 200
     jb cnao
-    ; ======================================================
-    ; FIX: COIN SAFE DISTANCE CHECK
-    ; ======================================================
+
 
     ; 1. Check distance from Blue Car
     mov cx, [blue_car_y]
@@ -631,11 +633,11 @@ keep_coin_waiting:
     ; Not safe yet, keep coin off-screen
     mov word [coin_y], 205 
     jmp cnao
-    ; ======================================================    
+  
 
 cnao:
     call draw_coin
-    ; NEW: FUEL CAN LOGIC
+    ;FUEL CAN LOGIC
     inc word [fuel_spawn_counter]
     
     ; Spawn new fuel can every 150 frames (less frequent than coins)
@@ -645,9 +647,7 @@ cnao:
     jl fuel_can_already_active
  
 
-    ; ======================================================
-    ; FIX: FUEL SAFE DISTANCE CHECK
-    ; ======================================================
+
     
     ; 1. Check Blue Car Position
     mov ax, [blue_car_y]
@@ -659,7 +659,7 @@ cnao:
     cmp ax, 70              ; If coin is in top 70px
     jl fuel_can_already_active ; Don't spawn yet
 
-    ; ======================================================
+
     
     ; Spawn new fuel can
     mov word [fuel_spawn_counter], 0
@@ -706,11 +706,11 @@ fuel_can_already_active:
     jmp skip_fuel_can_update
     
 fuel_can_onscreen:
-; --- FIX START ---
+
     ; Check if the can was collected inside check_fuel_can_collection
     cmp word [fuel_can_active], 0  
     je skip_fuel_can_update        ; If collected (0), DO NOT DRAW. Skip immediately.
-    ; --- FIX END ---
+
     call draw_fuel_can
     
 skip_fuel_can_update:
@@ -735,7 +735,7 @@ no_wrap:
     jmp skip_fuel_update
 
 fuel_ran_out:
-    jmp show_fuel_out_screen     ; JUMP TO NEW FUEL SCREEN
+    jmp show_fuel_out_screen     ; JUMP TO FUEL SCREEN
 
 skip_fuel_update:
     ; --- FUEL LOGIC END ---
@@ -758,7 +758,7 @@ exit_game:
     jmp show_quit_screen
 
 ; ==================================================================
-; NEW: CRASH SCREEN (Collision)
+;  CRASH SCREEN (Collision)
 ; ==================================================================
 show_crash_screen:
     mov ax, 0013h
@@ -812,7 +812,7 @@ wait_crash_input:
     int 16h
     cmp ah, 01h     ; ESC -> EXIT
     je quit_direct_dos_jump3
-    ; --- MODIFIED: Check for R/r to go to Results ---
+    
     cmp al, 'r'     ; R -> Results
     je show_results_screen_jump
     cmp al, 'R'     ; R -> Results
@@ -826,7 +826,7 @@ show_results_screen_jump:
     jmp show_results_screen
 
 ; ==================================================================
-; NEW: FUEL OUT SCREEN
+; FUEL OUT SCREEN
 ; ==================================================================
 show_fuel_out_screen:
     mov ax, 0013h
@@ -880,7 +880,7 @@ wait_fu_input:
     int 16h
     cmp ah, 0x01
     je quit_direct_dos_jump3
-    ; --- MODIFIED: Check for R/r to go to Results ---
+    
     cmp al, 'r'
     je show_results_screen_jump
     cmp al, 'R'
@@ -888,7 +888,7 @@ wait_fu_input:
     jmp wait_fu_input
 
 ; ==================================================================
-; NEW: RESULTS SCREEN (Loaded via 'R')
+;  RESULTS SCREEN (Loaded via 'R')
 ; ==================================================================
 show_results_screen:
     mov ax, 0013h
@@ -990,6 +990,7 @@ wait_re_input:
     jmp wait_re_input
 
 restart_results_jump:
+    call remove_music_interrupt
     jmp section_1_9_start
 
 ; ==================================================================
@@ -1052,6 +1053,7 @@ wait_quit_input:
     jmp wait_quit_input
 
 jmp_sec_1_9:
+    call remove_music_interrupt
     jmp section_1_9_start
 
 ; ==================================================================
@@ -1178,7 +1180,7 @@ no_coin_collect:
     pop ax
     ret
 
-; --- CHECK_FUEL_CAN_COLLECTION ---
+
 check_fuel_can_collection:
     push ax
     push bx
@@ -1208,12 +1210,12 @@ f_abs_y:
     jge f_abs_x
     neg ax
 f_abs_x:
-    cmp ax, 25       ; Width Collision Threshold (Increased for easier side collection)
+    cmp ax, 25       ; Width Collision Threshold 
     jg no_fuel_collection
 
     ; --- COLLISION DETECTED ---
     
-    ; A. Erase the can immediately so it doesn't get drawn again next frame
+    
     call erase_fuel_can
 
     ; B. Deactivate Fuel Can Logic
@@ -1231,10 +1233,7 @@ f_not_full:
     ; D. Update UI
     call draw_fuel_bar           ; Update the fuel bar on screen
     
-    ; ==========================================================
-    ; THE FIX: REDRAW CAR IMMEDIATELY
-    ; This paints your car back over the "hole" left by erasing the can.
-    ; ==========================================================
+
     call draw_car 
     ; ==========================================================
 
@@ -1695,34 +1694,46 @@ print_done_bios:
     pop ax
     ret
 
-; --- Existing Erasers ---
+
+
 erase_blue_car:
     push ax
     push bx
     push cx
     push si
     push di
-    mov al, 8
+    
+    mov al, 8               ; Road Color (Gray)
     mov si, [blue_car_y_old]
     mov di, [blue_car_x_old]
     sub di, 2
-    mov cx, 40
+    mov cx, 40              ; Car Height
+
 erase_row:
     push cx
+    
+    ; --- SAFETY CHECK START ---
     cmp si, 200
-    jge erase_skip_row
+    jge erase_skip_row      ; If below screen, skip
+    cmp si, 0
+    jl erase_skip_row       ; If above screen (Negative), SKIP!
+    ; --- SAFETY CHECK END ---
+    
     mov bx, si
     imul bx, 320
     add bx, di
-    mov cx, 28
+    
+    mov cx, 28              ; Car Width
 erase_col:
-    mov [es:bx], al
+    mov [es:bx], al         ; Paint Gray
     inc bx
     loop erase_col
+
 erase_skip_row:
     inc si
     pop cx
     loop erase_row
+    
     pop di
     pop si
     pop cx
@@ -1730,7 +1741,7 @@ erase_skip_row:
     pop ax
     ret
 
-; --- SMART ERASE COIN ---
+
 ; Checks if the pixel is part of the CAR (Red, Black, White) before erasing.
 ; If it is a car pixel, we leave it alone. Otherwise, paint it grey (Road).
 erase_coin:
@@ -1769,11 +1780,11 @@ coin_erase_col:
     cmp ah, 12          
     je skip_erase_pixel
 
-    ; 3. Check Black details/Tires (Color 0) <--- ADDED
+    ; 3. Check Black details/Tires (Color 0) 
     cmp ah, 0
     je skip_erase_pixel
 
-    ; 4. Check White lights/Windshield (Color 15) <--- ADDED
+    ; 4. Check White lights/Windshield (Color 15) 
     cmp ah, 15
     je skip_erase_pixel
 
@@ -1803,7 +1814,7 @@ erase_red_car:
     push cx
     push si
     push di
-    mov al, 8      ; ROAD_COLOR fixed to 8 for speed
+    mov al, 8      ; ROAD_COLOR 
     mov si, [car_y_old]
     mov di, [car_x_old]
     sub di, 2
@@ -2021,6 +2032,12 @@ mcd_exit:
 
 handle_pause_input:
     push ax
+    
+    ; Silence speaker while paused
+    in al, 61h
+    and al, 0FCh
+    out 61h, al
+    
     mov ah, 0
     int 16h
     cmp ah, 01h
@@ -2638,7 +2655,7 @@ draw_fuel_text:
     ret
 
 ; ==================================================================
-; NEW: DRAW FUEL BAR
+;  DRAW FUEL BAR
 ; ==================================================================
 draw_fuel_bar:
     push ax
@@ -3285,7 +3302,7 @@ drt2_skip:
     pop ax
     ret
 
-draw_blue_car:
+    draw_blue_car:
     push ax
     push bx
     push cx
@@ -3311,15 +3328,22 @@ draw_blue_car:
     pop ax
     ret
 
+
 draw_blue_front:
     push ax
     push bx
     push cx
     push dx
     push si
+    
+    ; --- ROW 1 ---
     mov dx, si
     cmp dx, 200
-    jge b_df1_skip
+    jge b_df1_trampoline    ; Jump to trampoline if bottom clipped
+    cmp dx, 0
+    jl b_df1_trampoline     ; Jump to trampoline if top clipped
+    
+    ; Draw Row 1
     mov bx, dx
     imul bx, 320
     add bx, di
@@ -3329,10 +3353,23 @@ b_df1:
     mov byte [es:bx], 1
     inc bx
     loop b_df1
+    jmp b_df1_done
+
+b_df1_trampoline:           ; Helper label for long jumps
+    jmp b_df1_skip
+
+b_df1_done:
 b_df1_skip:
-    inc dx
+    inc si                  ; Move to next row relative to SI
+    mov dx, si              ; Update DX
+
+    ; --- ROW 2 ---
     cmp dx, 200
-    jge b_df2_skip
+    jge b_df2_trampoline
+    cmp dx, 0
+    jl b_df2_trampoline
+    
+    ; Draw Row 2
     mov bx, dx
     imul bx, 320
     add bx, di
@@ -3346,10 +3383,23 @@ b_df2:
     mov byte [es:bx+2], 9
     inc bx
     loop b_df2
+    jmp b_df2_done
+
+b_df2_trampoline:
+    jmp b_df2_skip
+
+b_df2_done:
 b_df2_skip:
-    inc dx
+    inc si
+    mov dx, si
+
+    ; --- ROW 3 ---
     cmp dx, 200
-    jge b_df3_skip
+    jge b_df3_trampoline
+    cmp dx, 0
+    jl b_df3_trampoline
+    
+    ; Draw Row 3
     mov bx, dx
     imul bx, 320
     add bx, di
@@ -3367,6 +3417,10 @@ b_df3:
     mov byte [es:bx+4], 0
     inc bx
     loop b_df3
+
+b_df3_trampoline:
+    jmp b_df3_skip
+
 b_df3_skip:
     pop si
     add si, 3
@@ -3385,7 +3439,10 @@ draw_blue_hood:
     mov ax, 3
 b_dh1:
     cmp si, 200
-    jge b_dh_skip_row
+    jge b_dh_skip_safe
+    cmp si, 0
+    jl b_dh_skip_safe
+
     mov bx, si
     imul bx, 320
     add bx, di
@@ -3402,6 +3459,12 @@ b_dh2:
     add bx, di
     mov byte [es:bx+8], 1
     mov byte [es:bx+14], 1
+    jmp b_dh_next_iter
+
+b_dh_skip_safe:
+    jmp b_dh_skip_row
+
+b_dh_next_iter:
 b_dh_skip_row:
     inc si
     dec ax
@@ -3420,8 +3483,12 @@ draw_blue_windshield_f:
     push cx
     push dx
     push si
+    
+    ; Row 1
     cmp si, 200
-    jge b_dwf1_skip
+    jge b_dwf1_out
+    cmp si, 0
+    jl b_dwf1_out
     mov bx, si
     imul bx, 320
     add bx, di
@@ -3436,10 +3503,18 @@ b_dwf1:
     mov byte [es:bx+1], 0
     inc bx
     loop b_dwf1
+    jmp b_dwf1_done
+b_dwf1_out:
+    jmp b_dwf1_skip
+b_dwf1_done:
 b_dwf1_skip:
     inc si
+
+    ; Row 2
     cmp si, 200
-    jge b_dwf2_skip
+    jge b_dwf2_out
+    cmp si, 0
+    jl b_dwf2_out
     mov bx, si
     imul bx, 320
     add bx, di
@@ -3452,10 +3527,18 @@ b_dwf2:
     mov byte [es:bx+2], 0
     inc bx
     loop b_dwf2
+    jmp b_dwf2_done
+b_dwf2_out:
+    jmp b_dwf2_skip
+b_dwf2_done:
 b_dwf2_skip:
     inc si
+
+    ; Row 3
     cmp si, 200
-    jge b_dwf3_skip
+    jge b_dwf3_out
+    cmp si, 0
+    jl b_dwf3_out
     mov bx, si
     imul bx, 320
     add bx, di
@@ -3466,10 +3549,18 @@ b_dwf3:
     mov byte [es:bx+3], 0
     inc bx
     loop b_dwf3
+    jmp b_dwf3_done
+b_dwf3_out:
+    jmp b_dwf3_skip
+b_dwf3_done:
 b_dwf3_skip:
     inc si
+
+    ; Row 4
     cmp si, 200
-    jge b_dwf4_skip
+    jge b_dwf4_out
+    cmp si, 0
+    jl b_dwf4_out
     mov bx, si
     imul bx, 320
     add bx, di
@@ -3480,10 +3571,18 @@ b_dwf4:
     mov byte [es:bx+3], 0
     inc bx
     loop b_dwf4
+    jmp b_dwf4_done
+b_dwf4_out:
+    jmp b_dwf4_skip
+b_dwf4_done:
 b_dwf4_skip:
     inc si
+
+    ; Row 5
     cmp si, 200
-    jge b_dwf5_skip
+    jge b_dwf5_out
+    cmp si, 0
+    jl b_dwf5_out
     mov bx, si
     imul bx, 320
     add bx, di
@@ -3494,6 +3593,10 @@ b_dwf5:
     mov byte [es:bx+3], 0
     inc bx
     loop b_dwf5
+    jmp b_dwf5_done
+b_dwf5_out:
+    jmp b_dwf5_skip
+b_dwf5_done:
 b_dwf5_skip:
     pop si
     add si, 5
@@ -3513,7 +3616,10 @@ draw_blue_roof:
     mov ax, si
 b_dr1_:
     cmp si, 200
-    jge b_dr_skip_row
+    jge b_dr_skip_safe
+    cmp si, 0
+    jl b_dr_skip_safe
+
     mov bx, si
     imul bx, 320
     add bx, di
@@ -3528,12 +3634,22 @@ b_dr2_:
     add bx, di
     mov byte [es:bx+2], 1
     mov byte [es:bx+21], 1
+    jmp b_dr_next
+
+b_dr_skip_safe:
+    jmp b_dr_skip_row
+
+b_dr_next:
 b_dr_skip_row:
     inc si
     dec dx
     jnz b_dr1_
+    
     cmp ax, 200
     jge b_dr_skip_sunroof
+    cmp ax, 0
+    jl b_dr_skip_sunroof
+
     mov bx, ax
     imul bx, 320
     add bx, di
@@ -3561,7 +3677,10 @@ draw_blue_body:
     mov dx, 10
 b_db1:
     cmp si, 200
-    jge b_db_skip_row
+    jge b_db_skip_safe
+    cmp si, 0
+    jl b_db_skip_safe
+
     mov bx, si
     imul bx, 320
     add bx, di
@@ -3578,6 +3697,12 @@ b_db2:
     add bx, di
     mov byte [es:bx+5], 15
     mov byte [es:bx+18], 15
+    jmp b_db_next
+
+b_db_skip_safe:
+    jmp b_db_skip_row
+
+b_db_next:
 b_db_skip_row:
     inc si
     dec dx
@@ -3596,8 +3721,12 @@ draw_blue_windshield_r:
     push cx
     push dx
     push si
+    
+    ; Row 1
     cmp si, 200
-    jge b_dwr1_skip
+    jge b_dwr1_out
+    cmp si, 0
+    jl b_dwr1_out
     mov bx, si
     imul bx, 320
     add bx, di
@@ -3608,10 +3737,18 @@ b_dwr1:
     mov byte [es:bx+3], 0
     inc bx
     loop b_dwr1
+    jmp b_dwr1_done
+b_dwr1_out:
+    jmp b_dwr1_skip
+b_dwr1_done:
 b_dwr1_skip:
     inc si
+
+    ; Row 2
     cmp si, 200
-    jge b_dwr2_skip
+    jge b_dwr2_out
+    cmp si, 0
+    jl b_dwr2_out
     mov bx, si
     imul bx, 320
     add bx, di
@@ -3622,10 +3759,18 @@ b_dwr2:
     mov byte [es:bx+3], 0
     inc bx
     loop b_dwr2
+    jmp b_dwr2_done
+b_dwr2_out:
+    jmp b_dwr2_skip
+b_dwr2_done:
 b_dwr2_skip:
     inc si
+
+    ; Row 3
     cmp si, 200
-    jge b_dwr3_skip
+    jge b_dwr3_out
+    cmp si, 0
+    jl b_dwr3_out
     mov bx, si
     imul bx, 320
     add bx, di
@@ -3636,10 +3781,18 @@ b_dwr3:
     mov byte [es:bx+3], 0
     inc bx
     loop b_dwr3
+    jmp b_dwr3_done
+b_dwr3_out:
+    jmp b_dwr3_skip
+b_dwr3_done:
 b_dwr3_skip:
     inc si
+
+    ; Row 4
     cmp si, 200
-    jge b_dwr4_skip
+    jge b_dwr4_out
+    cmp si, 0
+    jl b_dwr4_out
     mov bx, si
     imul bx, 320
     add bx, di
@@ -3650,10 +3803,18 @@ b_dwr4:
     mov byte [es:bx+2], 0
     inc bx
     loop b_dwr4
+    jmp b_dwr4_done
+b_dwr4_out:
+    jmp b_dwr4_skip
+b_dwr4_done:
 b_dwr4_skip:
     inc si
+
+    ; Row 5
     cmp si, 200
-    jge b_dwr5_skip
+    jge b_dwr5_out
+    cmp si, 0
+    jl b_dwr5_out
     mov bx, si
     imul bx, 320
     add bx, di
@@ -3664,6 +3825,10 @@ b_dwr5:
     mov byte [es:bx+1], 0
     inc bx
     loop b_dwr5
+    jmp b_dwr5_done
+b_dwr5_out:
+    jmp b_dwr5_skip
+b_dwr5_done:
 b_dwr5_skip:
     pop si
     add si, 5
@@ -3679,8 +3844,12 @@ draw_blue_trunk:
     push cx
     push dx
     push si
+    
+    ; Row 1
     cmp si, 200
-    jge b_dt1_skip
+    jge b_dt1_out
+    cmp si, 0
+    jl b_dt1_out
     mov bx, si
     imul bx, 320
     add bx, di
@@ -3691,10 +3860,18 @@ b_dt1:
     mov byte [es:bx+1], 1
     inc bx
     loop b_dt1
+    jmp b_dt1_done
+b_dt1_out:
+    jmp b_dt1_skip
+b_dt1_done:
 b_dt1_skip:
     inc si
+
+    ; Row 2
     cmp si, 200
-    jge b_dt2_skip
+    jge b_dt2_out
+    cmp si, 0
+    jl b_dt2_out
     mov bx, si
     imul bx, 320
     add bx, di
@@ -3710,10 +3887,18 @@ b_dt2:
     add bx, di
     mov byte [es:bx+8], 1
     mov byte [es:bx+15], 1
+    jmp b_dt2_done
+b_dt2_out:
+    jmp b_dt2_skip
+b_dt2_done:
 b_dt2_skip:
     inc si
+
+    ; Row 3
     cmp si, 200
-    jge b_dt3_skip
+    jge b_dt3_out
+    cmp si, 0
+    jl b_dt3_out
     mov bx, si
     imul bx, 320
     add bx, di
@@ -3729,10 +3914,18 @@ b_dt3:
     add bx, di
     mov byte [es:bx+8], 1
     mov byte [es:bx+15], 1
+    jmp b_dt3_done
+b_dt3_out:
+    jmp b_dt3_skip
+b_dt3_done:
 b_dt3_skip:
     inc si
+
+    ; Row 4
     cmp si, 200
-    jge b_dt4_skip
+    jge b_dt4_out
+    cmp si, 0
+    jl b_dt4_out
     mov bx, si
     imul bx, 320
     add bx, di
@@ -3743,10 +3936,18 @@ b_dt4:
     mov byte [es:bx+2], 1
     inc bx
     loop b_dt4
+    jmp b_dt4_done
+b_dt4_out:
+    jmp b_dt4_skip
+b_dt4_done:
 b_dt4_skip:
     inc si
+
+    ; Row 5
     cmp si, 200
-    jge b_dt5_skip
+    jge b_dt5_out
+    cmp si, 0
+    jl b_dt5_out
     mov bx, si
     imul bx, 320
     add bx, di
@@ -3757,6 +3958,10 @@ b_dt5:
     mov byte [es:bx+3], 1
     inc bx
     loop b_dt5
+    jmp b_dt5_done
+b_dt5_out:
+    jmp b_dt5_skip
+b_dt5_done:
 b_dt5_skip:
     pop si
     add si, 5
@@ -3772,8 +3977,12 @@ draw_blue_rear_bumper:
     push cx
     push dx
     push si
+    
+    ; Row 1
     cmp si, 200
-    jge b_drb1_skip
+    jge b_drb1_out
+    cmp si, 0
+    jl b_drb1_out
     mov bx, si
     imul bx, 320
     add bx, di
@@ -3784,10 +3993,18 @@ b_drb1:
     mov byte [es:bx+3], 1
     inc bx
     loop b_drb1
+    jmp b_drb1_done
+b_drb1_out:
+    jmp b_drb1_skip
+b_drb1_done:
 b_drb1_skip:
     inc si
+
+    ; Row 2
     cmp si, 200
-    jge b_drb2_skip
+    jge b_drb2_out
+    cmp si, 0
+    jl b_drb2_out
     mov bx, si
     imul bx, 320
     add bx, di
@@ -3802,10 +4019,18 @@ b_drb2:
     mov byte [es:bx+5], 8
     inc bx
     loop b_drb2
+    jmp b_drb2_done
+b_drb2_out:
+    jmp b_drb2_skip
+b_drb2_done:
 b_drb2_skip:
     inc si
+
+    ; Row 3
     cmp si, 200
-    jge b_drb3_skip
+    jge b_drb3_out
+    cmp si, 0
+    jl b_drb3_out
     mov bx, si
     imul bx, 320
     add bx, di
@@ -3816,6 +4041,10 @@ b_drb3:
     mov byte [es:bx+4], 8
     inc bx
     loop b_drb3
+    jmp b_drb3_done
+b_drb3_out:
+    jmp b_drb3_skip
+b_drb3_done:
 b_drb3_skip:
     pop si
     add si, 3
@@ -3830,8 +4059,12 @@ draw_blue_rear_taper:
     push bx
     push cx
     push si
+    
+    ; Row 1
     cmp si, 200
-    jge b_drt1_skip
+    jge b_drt1_out
+    cmp si, 0
+    jl b_drt1_out
     mov bx, si
     imul bx, 320
     add bx, di
@@ -3841,10 +4074,18 @@ b_drt1:
     mov byte [es:bx], 1
     inc bx
     loop b_drt1
+    jmp b_drt1_done
+b_drt1_out:
+    jmp b_drt1_skip
+b_drt1_done:
 b_drt1_skip:
     inc si
+
+    ; Row 2
     cmp si, 200
-    jge b_drt2_skip
+    jge b_drt2_out
+    cmp si, 0
+    jl b_drt2_out
     mov bx, si
     imul bx, 320
     add bx, di
@@ -3854,6 +4095,10 @@ b_drt2:
     mov byte [es:bx], 1
     inc bx
     loop b_drt2
+    jmp b_drt2_done
+b_drt2_out:
+    jmp b_drt2_skip
+b_drt2_done:
 b_drt2_skip:
     pop si
     pop cx
@@ -3865,8 +4110,11 @@ b_drt2_skip:
 ; MULTITASKING: BACKGROUND MUSIC ISR
 ; ==================================================================
 setup_music_interrupt:
-    cli                         ; Disable interrupts while hooking
+    ; Remove any existing interrupt first
+    call remove_music_interrupt
     
+    cli                         ; Disable interrupts while hooking
+    ; 1. Save Old Interrupt Vector (INT 1Ch - System Timer Tick)
     mov ah, 35h
     mov al, 1Ch
     int 21h
@@ -3878,13 +4126,15 @@ setup_music_interrupt:
     mov al, 1Ch
     mov dx, music_player_isr
     push cs
-    pop ds                  
+    pop ds                  ; DS must point to our segment
     int 21h
     
+    ; 3. Reset music state
+    mov word [current_note_idx], 0
+    mov word [music_tick_count], 1
     mov byte [music_active], 1
     sti                         ; Re-enable interrupts
     ret
-
 remove_music_interrupt:
     cmp byte [music_active], 0
     je remove_skip
@@ -3896,22 +4146,25 @@ remove_music_interrupt:
     out 61h, al
 
     ; 2. Restore Old Interrupt Vector
+    push ds
     mov dx, [old_isr_offset]
-    mov ds, [old_isr_segment]
+    mov ax, [old_isr_segment]
+    mov ds, ax
     mov ah, 25h
     mov al, 1Ch
     int 21h
-    
-    push cs                  ; Restore DS to Code Segment
     pop ds
-    sti
+    
     mov byte [music_active], 0
+    sti
 remove_skip:
     ret
 
-
+; ------------------------------------------------------------------
+; The "Process" that runs in the background 18.2 times/sec
+; ------------------------------------------------------------------
 music_player_isr:
-    pusha                    
+    pusha                    ; Save all registers (Context Switch)
     push ds
     push es
     
@@ -3922,20 +4175,20 @@ music_player_isr:
     ; Logic: Decrease duration counter
     dec word [music_tick_count]
     cmp word [music_tick_count], 0
-    jg music_keep_playing   
+    jg music_keep_playing   ; Current note not finished
 
     ; Load Next Note
     mov si,  music_score
     add si, [current_note_idx]
     
-    mov ax, [si]           
+    mov ax, [si]            ; Read Frequency
     cmp ax, 0
-    je music_reset_song     
+    je music_reset_song      ; If 0, loop back to start
 
-    mov cx, [si+2]          
+    mov cx, [si+2]          ; Read Duration
     mov [music_tick_count], cx
     
-    add word [current_note_idx], 4 
+    add word [current_note_idx], 4 ; Move to next pair (2 words = 4 bytes)
 
     ; Play the Sound
     call play_frequency_port
@@ -3943,14 +4196,14 @@ music_player_isr:
 
 music_reset_song:
     mov word [current_note_idx], 0
-    mov word [music_tick_count], 1 
+    mov word [music_tick_count], 1 ; Trigger load next tick
     jmp music_keep_playing
 
 music_keep_playing:
     pop es
     pop ds
-    popa                    
-    iret                   
+    popa                    ; Restore registers
+    iret                    ; Return from Interrupt
 
 ; ------------------------------------------------------------------
 ; HARDWARE PORT ACCESS
@@ -4098,7 +4351,7 @@ file_fu_pix db "fupixels.bin", 0
 file_re_pal db "repal.bin", 0
 file_re_pix db "repixels.bin", 0
 
-
+; --- NEW STRINGS FOR RESULTS SCREEN ---
 txt_res_name  db "NAME: ", 0
 txt_res_roll  db "ROLL: ", 0
 txt_res_score db "SCORE: ", 0
@@ -4123,7 +4376,8 @@ music_tick_count dw 1
 current_note_idx dw 0
 music_active     db 0    ; 1 = ON, 0 = OFF
 
-
+; THE MELODY: Pair of DW (Frequency, Duration in ticks)
+; REPLACED: Faster Tempo for Racing Game (Duration 2 ticks = ~0.11s)
 music_score:
     ; Pattern 1: Fast rising arpeggio (C Major)
     dw NOTE_C4, 2, NOTE_E4, 2, NOTE_G4, 2, NOTE_C5, 2
