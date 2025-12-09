@@ -85,7 +85,7 @@ load_error:
 wait_for_space:
     mov ah, 0
     int 16h
-    
+   
     ; Check for ESC
     cmp ah, 01h
     je title_esc_pressed
@@ -213,7 +213,7 @@ instructions_resume:
 start_data_entry:
 
     ; 1. LOAD NAME/ROLL IMAGE (nrpal.bin / nrpixels.bin)
-    
+   
     ; Palette
     mov ah, 3Dh
     mov al, 0
@@ -259,7 +259,7 @@ out_nr_pal_loop:
 
 
     push cs
-    pop es 
+    pop es
     ; ==========================================================
 
     jmp start_typing
@@ -276,7 +276,7 @@ start_typing:
     mov dh, 6        ; Row
     mov dl, 13       ; Column
     int 10h
-    
+   
     mov di, player_name
     call get_input_string
 
@@ -287,7 +287,7 @@ start_typing:
     mov dh, 13       ; Row
     mov dl, 13       ; Column
     int 10h
-    
+   
     mov di, player_roll
     call get_input_string
 
@@ -456,10 +456,10 @@ lane1_initial:
 lane2_initial:
     mov word [blue_car_x], 148
 initialize_y:
-  
-    mov word [blue_car_y], -45 
+ 
+    mov word [blue_car_y], -45
     ; -----------------------------------------------
-    
+   
 mov ax, [blue_car_x]
 mov [blue_car_x_old], ax
 mov word [blue_car_y_old], -45  ; Update old Y as well
@@ -506,35 +506,35 @@ running_game:
     mov dx, 0x0000
     mov ah, 86h
     int 15h
-    
+   
     call handle_input
-    
-    
+   
+   
     cmp word [game_state], 1
     je continue_render
     jmp animation_loop
 continue_render:
-    
+   
     call draw_scrolling_grass
     call draw_lane_markers
-    
+   
     call erase_blue_car
     mov ax, [blue_car_y]
     mov [blue_car_y_old], ax
     mov ax, [blue_car_x]
     mov [blue_car_x_old], ax
-    
+   
     mov ax, [blue_car_y]
     add ax, 4
     mov [blue_car_y], ax
-    
+   
     ; Collision
     call check_collision
     cmp word [collision_flag], 1
     jne no_collision_continue
     jmp game_over_collision
 no_collision_continue:
-    
+   
     cmp ax, 200
     jl bnao
 
@@ -552,10 +552,9 @@ no_collision_continue:
 
 spawn_blue_car_now:
     ; Safe to spawn - proceed with standard reset
-    inc word [score]        ; Increase score by 1
-    call draw_score         ; Update score display
-    
-    
+
+   
+   
     mov word [blue_car_y], -45
     ; -------------------------------------------------
 
@@ -579,7 +578,7 @@ keep_blue_car_waiting:
     mov word [blue_car_y], 205
     jmp bnao
 
-    
+   
 bnao:
     call draw_blue_car
 
@@ -588,14 +587,14 @@ bnao:
     mov [coin_y_old], ax
     mov ax, [coin_x]
     mov [coin_x_old], ax
-    
+   
     mov ax, [coin_y]
     add ax, 4
     mov [coin_y], ax
-    
+   
     ; Coin Check
     call check_coin_collection
-    
+   
     cmp ax, 200
     jb cnao
 
@@ -614,7 +613,7 @@ bnao:
 
 spawn_coin_now:
     mov word [coin_y], 10
-    
+   
     call get_random_0_to_2
     cmp bx, 0
     je coin_lane1
@@ -631,15 +630,15 @@ coin_lane2:
 
 keep_coin_waiting:
     ; Not safe yet, keep coin off-screen
-    mov word [coin_y], 205 
+    mov word [coin_y], 205
     jmp cnao
-  
+ 
 
 cnao:
     call draw_coin
     ;FUEL CAN LOGIC
     inc word [fuel_spawn_counter]
-    
+   
     ; Spawn new fuel can every 150 frames (less frequent than coins)
     cmp word [fuel_can_active], 0
     jne fuel_can_already_active
@@ -648,24 +647,24 @@ cnao:
  
 
 
-    
+   
     ; 1. Check Blue Car Position
     mov ax, [blue_car_y]
     cmp ax, 70              ; If car is in top 70px
     jl fuel_can_already_active ; Don't spawn yet, try next frame
-    
+   
     ; 2. Check Coin Position
     mov ax, [coin_y]
     cmp ax, 70              ; If coin is in top 70px
     jl fuel_can_already_active ; Don't spawn yet
 
 
-    
+   
     ; Spawn new fuel can
     mov word [fuel_spawn_counter], 0
     mov word [fuel_can_active], 1
     mov word [fuel_can_y], 10
-    
+   
     ; Random lane for fuel can
     call get_random_0_to_2
     cmp bx, 0
@@ -679,32 +678,32 @@ fuel_lane1_spawn:
     jmp fuel_can_already_active
 fuel_lane2_spawn:
     mov word [fuel_can_x], 160
-    
+   
 fuel_can_already_active:
     ; Update fuel can if active
     cmp word [fuel_can_active], 0
     je skip_fuel_can_update
-    
+   
     call erase_fuel_can
     mov ax, [fuel_can_y]
     mov [fuel_can_y_old], ax
     mov ax, [fuel_can_x]
     mov [fuel_can_x_old], ax
-    
+   
     mov ax, [fuel_can_y]
     add ax, 4
     mov [fuel_can_y], ax
-    
+   
     ; Check fuel can collection
     call check_fuel_can_collection
-    
+   
     ; Reset if off-screen
     cmp ax, 200
     jb fuel_can_onscreen
     mov word [fuel_can_active], 0
     mov word [fuel_can_y], -50
     jmp skip_fuel_can_update
-    
+   
 fuel_can_onscreen:
 
     ; Check if the can was collected inside check_fuel_can_collection
@@ -712,7 +711,7 @@ fuel_can_onscreen:
     je skip_fuel_can_update        ; If collected (0), DO NOT DRAW. Skip immediately.
 
     call draw_fuel_can
-    
+   
 skip_fuel_can_update:
 
     mov ax, [lane_offset]
@@ -722,7 +721,7 @@ skip_fuel_can_update:
     sub ax, 75
 no_wrap:
     mov [lane_offset], ax
-    
+   
     ; --- FUEL LOGIC START ---
     inc word [fuel_timer]
     cmp word [fuel_timer], 5     ; Speed of fuel decrease
@@ -812,7 +811,7 @@ wait_crash_input:
     int 16h
     cmp ah, 01h     ; ESC -> EXIT
     je quit_direct_dos_jump3
-    
+   
     cmp al, 'r'     ; R -> Results
     je show_results_screen_jump
     cmp al, 'R'     ; R -> Results
@@ -880,7 +879,7 @@ wait_fu_input:
     int 16h
     cmp ah, 0x01
     je quit_direct_dos_jump3
-    
+   
     cmp al, 'r'
     je show_results_screen_jump
     cmp al, 'R'
@@ -949,7 +948,7 @@ out_re_pal_loop:
     mov dh, 9      ; Row
     mov dl, 17      ; Column
     int 10h
-    
+   
 
     ; Print Actual Name
     mov si, player_name
@@ -1140,6 +1139,7 @@ check_coin_collection:
     push ax
     push bx
     push cx
+   
     mov ax, [car_x]
     mov bx, [coin_x]
     sub ax, bx
@@ -1149,8 +1149,9 @@ check_coin_collection:
 check_coin_x_pos:
     cmp ax, 23
     jg no_coin_collect
+   
     mov ax, [car_y]
-    add ax,20
+    add ax, 20
     mov bx, [coin_y]
     sub ax, bx
     cmp ax, 0
@@ -1159,27 +1160,25 @@ check_coin_x_pos:
 check_coin_y_pos:
     cmp ax, 28
     jg no_coin_collect
+
+    ; --- COLLISION DETECTED ---
     inc word [score]
     call draw_score
-    mov word [coin_y], 10
-    call get_random_0_to_2
-    cmp bx, 0
-    je collected_lane1
-    cmp bx, 1
-    je collected_lane2
-    mov word [coin_x], 215
-    jmp no_coin_collect
-collected_lane1:
-    mov word [coin_x], 105
-    jmp no_coin_collect
-collected_lane2:
-    mov word [coin_x], 160
+
+    ; FIX: Don't spawn at Y=10 immediately.
+    ; Send it off-screen (Y=215). The main loop's safety logic
+    ; will check the Blue Car position and reset this coin
+    ; only when it is safe to do so.
+    mov word [coin_y], 215  
+   
+    ; We don't need to set X or random lane here anymore,
+    ; the main loop handles that when it resets Y to 10.
+
 no_coin_collect:
     pop cx
     pop bx
     pop ax
     ret
-
 
 check_fuel_can_collection:
     push ax
@@ -1189,33 +1188,41 @@ check_fuel_can_collection:
 
     ; 1. Check Y intersection (Vertical Distance)
     mov ax, [car_y]
+   
+    ; FIX: Add offset to check from the CENTER of the car, not the top.
+    ; This delays collection until the fuel is actually overlapping.
+    add ax, 15          
+   
     mov bx, [fuel_can_y]
     sub ax, bx
-    
+   
     ; Get Absolute Value of Y Difference
     cmp ax, 0
     jge f_abs_y
     neg ax
 f_abs_y:
-    cmp ax, 20       ; Height Collision Threshold
+    ; FIX: Reduced Radius to 25.
+    ; Combined with the offset above, this ensures solid overlap
+    ; at both the Top AND Bottom of the car.
+    cmp ax, 25      
     jg no_fuel_collection
 
     ; 2. Check X intersection (Horizontal Distance)
     mov ax, [car_x]
     mov bx, [fuel_can_x]
     sub ax, bx
-    
+   
     ; Get Absolute Value of X Difference
     cmp ax, 0
     jge f_abs_x
     neg ax
 f_abs_x:
-    cmp ax, 25       ; Width Collision Threshold 
+    cmp ax, 25       ; Width Collision Threshold
     jg no_fuel_collection
 
     ; --- COLLISION DETECTED ---
-    
-    
+   
+    ; Erase the can visually
     call erase_fuel_can
 
     ; B. Deactivate Fuel Can Logic
@@ -1229,13 +1236,12 @@ f_abs_x:
     jle f_not_full
     mov word [fuel_val], 40      ; Cap at max
 f_not_full:
-    
+   
     ; D. Update UI
     call draw_fuel_bar           ; Update the fuel bar on screen
-    
-
-    call draw_car 
-    ; ==========================================================
+   
+    ; Redraw car to ensure no parts were clipped
+    call draw_car
 
 no_fuel_collection:
     pop dx
@@ -1256,7 +1262,7 @@ draw_fuel_can:
     mov si, [fuel_can_y]
     mov di, [fuel_can_x]
     sub di, 8              ; Center the can (16 pixels wide)
-    
+   
     mov cx, 18             ; Total Height (rows)
 
 draw_can_loop:
@@ -1277,7 +1283,7 @@ draw_can_loop:
 
 draw_handle_section:
     ; -- Handle & Nozzle (Top Rows) --
-    
+   
     ; Top of Handle (Row 18)
     cmp cx, 18
     je draw_handle_top
@@ -1287,12 +1293,12 @@ draw_handle_section:
     mov byte [es:bx+5], 4
     mov byte [es:bx+10], 4 ; Red Right
     mov byte [es:bx+11], 4
-    
+   
     ; Black Nozzle (Sticking out right)
     mov byte [es:bx+12], 0
     mov byte [es:bx+13], 0
     mov byte [es:bx+14], 0
-    
+   
     jmp skip_can_row_draw
 
 draw_handle_top:
@@ -1308,11 +1314,11 @@ fill_handle_top:
 
 draw_body_section:
     ; -- Main Box Body (Bottom Rows) --
-    
+   
     ; Black Outline (Left/Right)
     mov byte [es:bx+2], 0
     mov byte [es:bx+13], 0
-    
+   
     ; Red Fill Center
     mov dx, 10
     lea bp, [bx+3]
@@ -1336,7 +1342,7 @@ skip_can_row_draw:
     ret
 
 
-; --- ERASE_FUEL_CAN ROUTINE ---
+
 erase_fuel_can:
     push ax
     push bx
@@ -1345,35 +1351,69 @@ erase_fuel_can:
     push si
     push di
 
+    ; 1. BLIND ERASE (Clears the can, fixes the trail issue)
     mov si, [fuel_can_y]
     mov di, [fuel_can_x]
-    sub di, 8              ; Match draw offset
+    sub di, 8               ; Match draw offset
 
-    mov cx, 18             ; Height
-    mov al, 8              ; Color 8 = Gray (Road Color)
+    mov cx, 18              ; Height
+    mov al, 8               ; Road Color (Gray)
 
-erase_can_loop:
+erase_can_loop_simple:
     cmp si, 200
-    jge erase_can_skip
+    jge erase_can_next
     cmp si, 0
-    jl erase_can_skip
+    jl erase_can_next
 
     mov bx, si
     imul bx, 320
     add bx, di
 
-    mov dx, 16             ; Width (Cover full 16px area)
-erase_can_pixels:
-    mov [es:bx], al        ; Write Gray
+    mov dx, 16              ; Width
+erase_pixels_simple:
+    mov [es:bx], al         ; Force paint gray
     inc bx
     dec dx
-    jnz erase_can_pixels
+    jnz erase_pixels_simple
 
-erase_can_skip:
+erase_can_next:
     inc si
     dec cx
-    jnz erase_can_loop
+    jnz erase_can_loop_simple
 
+    ; 2. REPAIR CAR (Fixes the "eating car" issue)
+    ; Check if the Fuel Can is close to the Car.
+    ; If it is, we redraw the car immediately to patch any holes.
+   
+    ; Check Y Distance
+    mov ax, [car_y]
+    sub ax, [fuel_can_y]
+   
+    ; Absolute value of Y diff
+    cmp ax, 0
+    jge abs_diff_y
+    neg ax
+abs_diff_y:
+    cmp ax, 50              ; If Y distance < 50 pixels
+    jg skip_car_repair      ; Too far away, no need to repair
+
+    ; Check X Distance (Optimization)
+    mov ax, [car_x]
+    sub ax, [fuel_can_x]
+   
+    ; Absolute value of X diff
+    cmp ax, 0
+    jge abs_diff_x
+    neg ax
+abs_diff_x:
+    cmp ax, 40              ; If X distance < 40 pixels
+    jg skip_car_repair      ; Different lane, no need to repair
+
+    ; If we are here, the Fuel Can is touching/near the Car.
+    ; Redraw the car to ensure it looks solid.
+    call draw_car
+
+skip_car_repair:
     pop di
     pop si
     pop dx
@@ -1381,7 +1421,6 @@ erase_can_skip:
     pop bx
     pop ax
     ret
-
 ; --- Draw Score ---
 draw_score:
     push ax
@@ -1702,7 +1741,7 @@ erase_blue_car:
     push cx
     push si
     push di
-    
+   
     mov al, 8               ; Road Color (Gray)
     mov si, [blue_car_y_old]
     mov di, [blue_car_x_old]
@@ -1711,18 +1750,18 @@ erase_blue_car:
 
 erase_row:
     push cx
-    
+   
     ; --- SAFETY CHECK START ---
     cmp si, 200
     jge erase_skip_row      ; If below screen, skip
     cmp si, 0
     jl erase_skip_row       ; If above screen (Negative), SKIP!
     ; --- SAFETY CHECK END ---
-    
+   
     mov bx, si
     imul bx, 320
     add bx, di
-    
+   
     mov cx, 28              ; Car Width
 erase_col:
     mov [es:bx], al         ; Paint Gray
@@ -1733,7 +1772,7 @@ erase_skip_row:
     inc si
     pop cx
     loop erase_row
-    
+   
     pop di
     pop si
     pop cx
@@ -1780,11 +1819,11 @@ coin_erase_col:
     cmp ah, 12          
     je skip_erase_pixel
 
-    ; 3. Check Black details/Tires (Color 0) 
+    ; 3. Check Black details/Tires (Color 0)
     cmp ah, 0
     je skip_erase_pixel
 
-    ; 4. Check White lights/Windshield (Color 15) 
+    ; 4. Check White lights/Windshield (Color 15)
     cmp ah, 15
     je skip_erase_pixel
 
@@ -1814,7 +1853,7 @@ erase_red_car:
     push cx
     push si
     push di
-    mov al, 8      ; ROAD_COLOR 
+    mov al, 8      ; ROAD_COLOR
     mov si, [car_y_old]
     mov di, [car_x_old]
     sub di, 2
@@ -2032,12 +2071,12 @@ mcd_exit:
 
 handle_pause_input:
     push ax
-    
+   
     ; Silence speaker while paused
     in al, 61h
     and al, 0FCh
     out 61h, al
-    
+   
     mov ah, 0
     int 16h
     cmp ah, 01h
@@ -2070,101 +2109,101 @@ draw_confirmation_box:
     push di
     push es
     push ds
-    
+   
     ; Set video segment
     mov ax, 0xA000
     mov es, ax
-    
+   
     ; Save current video memory to buffer
     push cs
     pop ds
-    
+   
     mov si, [PAUSE_BOX_Y]
     mov di, 0                     ; Buffer offset
-    
+   
 save_vram_outer:
     mov cx, [PAUSE_BOX_H]
     mov dx, 0                     ; Row counter
-    
+   
 save_vram_row:
     cmp dx, cx                    ; Check if done with all rows
     jge save_done
-    
+   
     mov bx, si
     imul bx, 320
     add bx, [PAUSE_BOX_X]
-    
+   
     push cx
     mov cx, [PAUSE_BOX_W]
-    
+   
 save_vram_col:
     mov al, byte [es:bx]
     mov byte [pause_buffer+di], al
     inc bx
     inc di
     loop save_vram_col
-    
+   
     pop cx
     inc si
     inc dx
     jmp save_vram_row
-    
+   
 save_done:
     ; Draw solid background fill first
     mov si, [PAUSE_BOX_Y]
     mov dx, [PAUSE_BOX_H]
-    
+   
 fill_background:
     cmp dx, 0
     jle background_done
-    
+   
     mov bx, si
     imul bx, 320
     add bx, [PAUSE_BOX_X]
-    
+   
     mov cx, [PAUSE_BOX_W]
 fill_bg_row:
     mov byte [es:bx], 1            ; Dark blue background
     inc bx
     loop fill_bg_row
-    
+   
     inc si
     dec dx
     jmp fill_background
-    
+   
 background_done:
     ; Draw outer border (3 pixels thick)
     mov si, [PAUSE_BOX_Y]
     mov dx, [PAUSE_BOX_H]
-    
+   
 draw_outer_border:
     cmp dx, 0
     jle outer_border_done
-    
+   
     mov bx, si
     imul bx, 320
     add bx, [PAUSE_BOX_X]
-    
+   
     ; Check if this is in top 3 or bottom 3 rows
     mov ax, si
     sub ax, [PAUSE_BOX_Y]
     cmp ax, 3
     jl draw_full_border
-    
+   
     mov ax, [PAUSE_BOX_H]
     sub ax, 3
     mov cx, si
     sub cx, [PAUSE_BOX_Y]
     cmp cx, ax
     jge draw_full_border
-    
+   
     ; Middle section - draw left and right borders (3 pixels each)
     mov cx, 3
 draw_left_border:
     mov byte [es:bx], 0
     inc bx
     loop draw_left_border
-    
+   
     add bx, [PAUSE_BOX_W]
     sub bx, 6
     mov cx, 3
@@ -2172,56 +2211,56 @@ draw_right_border:
     mov byte [es:bx], 0
     inc bx
     loop draw_right_border
-    
+   
     jmp next_outer_row
-    
+   
 draw_full_border:
     mov cx, [PAUSE_BOX_W]
 draw_border_row:
     mov byte [es:bx], 0
     inc bx
     loop draw_border_row
-    
+   
 next_outer_row:
     inc si
     dec dx
     jmp draw_outer_border
-    
+   
 outer_border_done:
     ; Draw inner decorative border
     mov si, [PAUSE_BOX_Y]
     add si, 5
     mov dx, [PAUSE_BOX_H]
     sub dx, 10
-    
+   
 draw_inner_border:
     cmp dx, 0
     jle inner_done
-    
+   
     mov bx, si
     imul bx, 320
     add bx, [PAUSE_BOX_X]
     add bx, 5
-    
+   
     ; Check if top or bottom of inner border
     mov ax, [PAUSE_BOX_Y]
     add ax, 5
     cmp si, ax
     je draw_inner_full
-    
+   
     mov ax, [PAUSE_BOX_Y]
     add ax, [PAUSE_BOX_H]
     sub ax, 6
     cmp si, ax
     je draw_inner_full
-    
+   
     ; Just left and right pixels
     mov byte [es:bx], 15            ; White
     add bx, [PAUSE_BOX_W]
     sub bx, 11
     mov byte [es:bx], 15
     jmp next_inner_row
-    
+   
 draw_inner_full:
     mov cx, [PAUSE_BOX_W]
     sub cx, 10
@@ -2229,16 +2268,16 @@ draw_inner_row:
     mov byte [es:bx], 15            ; White
     inc bx
     loop draw_inner_row
-    
+   
 next_inner_row:
     inc si
     dec dx
     jmp draw_inner_border
-    
+   
 inner_done:
     ; Draw text lines using BIOS
-  
-    
+ 
+   
     ; Line 1: "GAME PAUSED"
     mov ah, 0x13
     mov al, 0x01
@@ -2251,7 +2290,7 @@ inner_done:
     pop es
     mov bp, pause_line1
     int 0x10
-    
+   
     ; Line 2: "QUIT? (Y/N)"
     mov ah, 0x13
     mov al, 0x01
@@ -2283,45 +2322,45 @@ erase_confirmation_box:
     push di
     push es
     push ds
-    
+   
     ; Set video segment
     mov ax, 0xA000
     mov es, ax
-    
+   
     ; Set data segment
     push cs
     pop ds
-    
+   
     mov si, [PAUSE_BOX_Y]
     mov di, 0                      ; Buffer offset
-    
+   
 restore_vram_outer:
     mov dx, 0                      ; Row counter
-    
+   
 restore_vram_row:
     mov cx, [PAUSE_BOX_H]
     cmp dx, cx                     ; Check if done with all rows
     jge restore_done
-    
+   
     mov bx, si
     imul bx, 320
     add bx, [PAUSE_BOX_X]
-    
+   
     push cx
     mov cx, [PAUSE_BOX_W]
-    
+   
 restore_vram_col:
     mov al, byte [pause_buffer+di]
     mov byte [es:bx], al
     inc bx
     inc di
     loop restore_vram_col
-    
+   
     pop cx
     inc si
     inc dx
     jmp restore_vram_row
-    
+   
 restore_done:
     pop ds
     pop es
@@ -2664,7 +2703,7 @@ draw_fuel_bar:
     push dx
     push si
     push di
-    
+   
     ; Define Bar Area (X:190, Y:180, MaxWidth:40, Height:6)
     ; First, draw black background for the whole max width (erase old)
     mov si, 180      ; Y start
@@ -2686,20 +2725,20 @@ draw_bar_bg_col:
     mov ax, [fuel_val]
     cmp ax, 0
     jle draw_bar_done ; If empty, nothing to draw
-    
+   
     mov si, 180
     mov dx, 6
-    
+   
 ; Determine Color
     mov al, 2           ; Default: Green
-    
+   
     cmp word [fuel_val], 20
     jg color_selected   ; If > 20 (Above 50%), keep Green
-    
+   
     mov al, 14          ; Set Yellow (50% or less)
     cmp word [fuel_val], 10
     jg color_selected   ; If > 10 (Above 25%), keep Yellow
-    
+   
     mov al, 4           ; Set Red (25% or less)
 
 color_selected:
@@ -3335,14 +3374,14 @@ draw_blue_front:
     push cx
     push dx
     push si
-    
+   
     ; --- ROW 1 ---
     mov dx, si
     cmp dx, 200
     jge b_df1_trampoline    ; Jump to trampoline if bottom clipped
     cmp dx, 0
     jl b_df1_trampoline     ; Jump to trampoline if top clipped
-    
+   
     ; Draw Row 1
     mov bx, dx
     imul bx, 320
@@ -3368,7 +3407,7 @@ b_df1_skip:
     jge b_df2_trampoline
     cmp dx, 0
     jl b_df2_trampoline
-    
+   
     ; Draw Row 2
     mov bx, dx
     imul bx, 320
@@ -3398,7 +3437,7 @@ b_df2_skip:
     jge b_df3_trampoline
     cmp dx, 0
     jl b_df3_trampoline
-    
+   
     ; Draw Row 3
     mov bx, dx
     imul bx, 320
@@ -3483,7 +3522,7 @@ draw_blue_windshield_f:
     push cx
     push dx
     push si
-    
+   
     ; Row 1
     cmp si, 200
     jge b_dwf1_out
@@ -3644,7 +3683,7 @@ b_dr_skip_row:
     inc si
     dec dx
     jnz b_dr1_
-    
+   
     cmp ax, 200
     jge b_dr_skip_sunroof
     cmp ax, 0
@@ -3721,7 +3760,7 @@ draw_blue_windshield_r:
     push cx
     push dx
     push si
-    
+   
     ; Row 1
     cmp si, 200
     jge b_dwr1_out
@@ -3844,7 +3883,7 @@ draw_blue_trunk:
     push cx
     push dx
     push si
-    
+   
     ; Row 1
     cmp si, 200
     jge b_dt1_out
@@ -3977,7 +4016,7 @@ draw_blue_rear_bumper:
     push cx
     push dx
     push si
-    
+   
     ; Row 1
     cmp si, 200
     jge b_drb1_out
@@ -4059,7 +4098,7 @@ draw_blue_rear_taper:
     push bx
     push cx
     push si
-    
+   
     ; Row 1
     cmp si, 200
     jge b_drt1_out
@@ -4112,7 +4151,7 @@ b_drt2_skip:
 setup_music_interrupt:
     ; Remove any existing interrupt first
     call remove_music_interrupt
-    
+   
     cli                         ; Disable interrupts while hooking
     ; 1. Save Old Interrupt Vector (INT 1Ch - System Timer Tick)
     mov ah, 35h
@@ -4128,7 +4167,7 @@ setup_music_interrupt:
     push cs
     pop ds                  ; DS must point to our segment
     int 21h
-    
+   
     ; 3. Reset music state
     mov word [current_note_idx], 0
     mov word [music_tick_count], 1
@@ -4138,7 +4177,7 @@ setup_music_interrupt:
 remove_music_interrupt:
     cmp byte [music_active], 0
     je remove_skip
-    
+   
     cli
     ; 1. Silence the Speaker immediately
     in al, 61h
@@ -4154,7 +4193,7 @@ remove_music_interrupt:
     mov al, 1Ch
     int 21h
     pop ds
-    
+   
     mov byte [music_active], 0
     sti
 remove_skip:
@@ -4167,7 +4206,7 @@ music_player_isr:
     pusha                    ; Save all registers (Context Switch)
     push ds
     push es
-    
+   
     ; Ensure DS points to our data
     push cs
     pop ds
@@ -4180,14 +4219,14 @@ music_player_isr:
     ; Load Next Note
     mov si,  music_score
     add si, [current_note_idx]
-    
+   
     mov ax, [si]            ; Read Frequency
     cmp ax, 0
     je music_reset_song      ; If 0, loop back to start
 
     mov cx, [si+2]          ; Read Duration
     mov [music_tick_count], cx
-    
+   
     add word [current_note_idx], 4 ; Move to next pair (2 words = 4 bytes)
 
     ; Play the Sound
@@ -4217,13 +4256,13 @@ play_frequency_port:
     push ax
     mov al, 0B6h            ; Channel 2, LSB/MSB, Square Wave
     out 43h, al
-    
+   
     ; 2. Calculate Divisor (1,193,180 / Frequency)
     mov dx, 0012h
     mov ax, 34DCh           ; DX:AX = 1,193,180
     pop bx                  ; Retrieve Frequency
     div bx
-    
+   
     ; 3. Send Divisor to Port 42h
     out 42h, al             ; Send LSB
     mov al, ah
@@ -4390,7 +4429,7 @@ music_score:
     ; Pattern 3: Rising Tension
     dw NOTE_E4, 2, NOTE_G4, 2, NOTE_B4, 2, NOTE_E4, 2
     dw NOTE_F4, 2, NOTE_A4, 2, NOTE_C5, 2, NOTE_F4, 2
-    
+   
     ; Pattern 4: Quick Descent
     dw NOTE_G4, 2, NOTE_F4, 2, NOTE_E4, 2, NOTE_D4, 2
     dw NOTE_C4, 4, 0, 4                               ; End phrase with a hold
