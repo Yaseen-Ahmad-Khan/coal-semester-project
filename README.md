@@ -13,6 +13,12 @@ A fast‑paced racing game written entirely in **x86 Assembly (NASM)**. Control 
 
 ---
 
+## 🎥 **Demo Gameplay**
+
+[Watch the Demo Gameplay Video](https://drive.google.com/file/d/1aSHFt12C48QAgftEJ4lEkK9qjnTubVBU/view?usp=sharing)
+
+---
+
 ## 🎮 **Game Instructions**
 
 ### 🕹️ **Controls**
